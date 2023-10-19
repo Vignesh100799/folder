@@ -1,0 +1,199 @@
+var code = {
+  getEmbedCode: function(pid){
+
+      bootbox.dialog({
+          message:
+              "<div class=\"row text-black\">" +
+              "<div class=\"col-xs-12\"><lable>Embed URL:</lable><input style=\"margin-bottom:10px;\" onclick=\"$(this).select();\" class=\"form-control\" type=\"text\" value=\"http://pastiebin.com/embed/" + pid + "\" /></div>" +
+              "</div>" +
+              "<div class=\"row\">" +
+              "<div class=\"col-xs-12\"><lable>Embed Iframe</lable><textarea  onclick=\"$(this).select();\" rows=\"10\" class=\"col-xs-12\"><iframe width=\"100%\" height=\"300\" src=\"//pastiebin.com/embed/" + pid + "\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\"></iframe></textarea></div><div class=\"clearfix\"></div>" +
+              "</div>",
+          title: "Embed Code",
+          buttons: {
+              Ok: {
+                  label: "Ok",
+                  className: "btn-default"
+              }
+          }
+      });
+  }
+};
+
+$(document).ready( function(){
+    var editor = '';
+    var save_code = '';
+    var windowsize = '';
+    var windowpadding = 135;
+    var codepreview = $('#codePreview');
+
+
+    $('.stringify').on('click', function(){
+        var source = editor.getDoc().getValue();
+        var opts = {
+            indent_size:4
+        };
+        var output = '';
+        if (looks_like_html(source)) {
+            output = html_beautify(source, opts);
+        } else {
+            if ($('#detect-packers').prop('checked')) {
+                source = unpacker_filter(source);
+            }
+            output = js_beautify(source, opts);
+        }
+        editor.getDoc().setValue(output);
+    });
+
+
+    /*******************
+     * Datatable deff
+     *
+     */
+
+     var yourPasties = $('#yourPasties').DataTable( {
+        "processing": true,
+        "serverSide": true,
+        "ajax": "/account/yourPastiesData",
+        "pageLength": 25
+     });
+
+     yourPasties.column('3:visible').order('desc').draw();
+
+     /* ===================================== */
+
+
+
+    $('#embedCode').on('click', function(){
+        var pastie_id = $(this).attr('date-pasite-id');
+        if(!!pastie_id){
+            code.getEmbedCode(pastie_id);
+        } else {
+            alert('Unable to get embed code!');
+        }
+    });
+
+
+    setTimeout(function(){
+        $('.message').fadeOut();
+    }, 5000);
+
+    if(document.getElementById("code"))
+    {
+        editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+            mode: "text/html",
+            tabMode: "shift",
+            matchBrackets: true,
+            scrollbarStyle: 'overlay',
+            lineNumbers: true,
+            autoMatchParens: true,
+            reindentOnLoad: true,
+            extraKeys:{
+                "Ctrl-R": function(){
+                    $('#togglePreview').click();
+                },
+                "Cmd-R": function(){
+                    $('#togglePreview').click();
+                }
+            },
+            rulers: [{color: "#840000", column: 100, lineStyle: "dashed"}]
+        });
+
+        editor.on("cursorActivity", function(){
+            var line = editor.getCursor(true).line;
+            var ch = editor.getCursor(true).ch;
+            $("#editor_status").html("Line: "+(line + 1)+", Column: " + (ch + 1));
+        });
+
+        CodeMirror.modeURL = "/themes/pbv2/js/libs/cm/mode/%N/%N.js";
+        var modeInput = $("#language");
+        $('#language').change(function(){
+            editor.setOption("mode", modeInput.val());
+            CodeMirror.autoLoadMode(editor, modeInput.val());
+        });
+        $('#language').change();
+
+
+        $(window).on('resize', function(){
+            $('.CodeMirror, .sidebar').css('height', $(window).height() - windowpadding);
+        });
+
+        $(window).resize();
+
+
+
+        //this bit of code is for the preview window
+        $('#togglePreview').on('click', function(){
+            if( $('#preview_window').is(":visible") )
+            {
+                windowpadding = 135;
+                $('#togglePreview').removeClass('btn-danger').addClass('btn-default').html('<span class="fa fa-play"></span> <span class="hidden-xs hidden-sm">Run</span>');
+                $('#preview_window').hide();
+                $('#codePreview').remove();
+
+            }
+            else
+            {
+                windowpadding = 485;
+                $('#preview_window').append('<iframe id="codePreview"></iframe>');
+                var d = $('#codePreview')[0].contentWindow.document;
+
+                $('#togglePreview').removeClass('btn-default').addClass('btn-danger').html('<span class="fa fa-stop"></span> <span class="hidden-xs hidden-sm">Stop</span>');
+
+                $('#preview_window').show();
+
+                editor.on('change', function(){
+                    d.open();
+                    d.write(editor.getValue());
+                    d.close();
+                });
+
+                d.open();
+                d.write(editor.getValue());
+                d.close();
+            }
+            $('.CodeMirror, .sidebar').css('height', $(window).height() - windowpadding);
+        });
+    }
+
+    //user settings js
+    $('#UserSettings a').click(function (e) {
+        e.preventDefault()
+        $(this).tab('show')
+    });
+
+
+    $('#sideBarMenu').click(function(e) {
+
+    });
+
+});
+
+
+function GetURLParameter(sParam)
+{
+    var sPageURL = window.location.search.substring(1);
+    var sURLVariables = sPageURL.split('&');
+    for (var i = 0; i < sURLVariables.length; i++)
+    {
+        var sParameterName = sURLVariables[i].split('=');
+        if (sParameterName[0] == sParam)
+        {
+            return sParameterName[1];
+        }
+    }
+}
+
+function isFullScreen(cm) {
+    return /\bCodeMirror-fullscreen\b/.test(cm.getWrapperElement().className);
+}
+
+function winHeight() {
+    return window.innerHeight || (document.documentElement || document.body).clientHeight;
+}
+
+function looks_like_html(source) {
+    // <foo> - looks like html
+    var trimmed = source.replace(/^[ \t\n\r]+/, '');
+    return trimmed && (trimmed.substring(0, 1) === '<');
+}
